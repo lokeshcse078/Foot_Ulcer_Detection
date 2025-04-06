@@ -24,6 +24,21 @@ def preprocess_image(image):
 
 # Streamlit interface
 st.title("Thermal Ulcer Detection")
+# Add this at the top, after st.title
+st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-image: url("https://raw.githubusercontent.com/lokeshcse078/Foot_Ulcer_Detection/main/bg.jpg");
+        background-size: cover;
+        background-repeat: no-repeat;
+        background-attachment: fixed;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True
+)
+
 st.write("Upload a thermal image to predict whether it has a foot ulcer or not.")
 
 uploaded_file = st.file_uploader("Choose a thermal image...", type=["jpg", "jpeg", "png"])
