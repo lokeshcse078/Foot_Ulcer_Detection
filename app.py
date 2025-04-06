@@ -10,13 +10,7 @@ MODEL_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/releases/downl
 MODEL_PATH = "model.h5"
 IMG_SIZE = (224, 224)
 
-# Download the model if it doesn't exist locally
-if not os.path.exists(MODEL_PATH):
-    st.write("Downloading model...")
-    response = requests.get(MODEL_URL)
-    with open(MODEL_PATH, 'wb') as f:
-        f.write(response.content)
-    st.write("Model downloaded successfully!")
+
 
 # Load the model
 model = tf.keras.models.load_model(MODEL_PATH)
@@ -36,7 +30,7 @@ uploaded_file = st.file_uploader("Choose a thermal image...", type=["jpg", "jpeg
 
 if uploaded_file is not None:
     image = load_img(uploaded_file)
-    st.image(image, caption="Uploaded Image", use_container_width=True)
+    st.image(image, caption="Uploaded Image", width=300)
 
     processed_image = preprocess_image(image)
     prediction = model.predict(processed_image)[0][0]
