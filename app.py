@@ -53,11 +53,7 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Sidebar content (acts like popup)
-with st.sidebar:
-    st.header("📬 Help Menu")
-    st.markdown("Need assistance?")
-    st.markdown("📧 **Email:** [sit23cs078@sairamtap.edu.in](mailto:sit23cs078@sairamtap.edu.in)")
+
 
 # Title
 st.title("🦶 Thermal Ulcer Detection")
