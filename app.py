@@ -24,6 +24,8 @@ def download_model():
 # Load model
 model = download_model()
 
+# Streamlit UI
+st.title("Thermal Ulcer Detection")
 # Custom CSS for background image
 st.markdown(
     f"""
@@ -38,9 +40,6 @@ st.markdown(
     """,
     unsafe_allow_html=True
 )
-
-# Streamlit UI
-st.title("Thermal Ulcer Detection")
 st.write("Upload a thermal image to predict whether it has a foot ulcer or not.")
 
 uploaded_file = st.file_uploader("Choose a thermal image...", type=["jpg", "jpeg", "png"])
