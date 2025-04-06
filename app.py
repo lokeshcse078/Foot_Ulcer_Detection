@@ -23,16 +23,41 @@ st.markdown(
         color: white;
     }}
 
-    /* Optional: style widgets with translucent background */
-    .css-1cpxqw2 {{
-        background-color: rgba(0, 0, 0, 0.6);
-        padding: 1rem;
-        border-radius: 1rem;
+    .menu-btn {{
+        position: fixed;
+        top: 15px;
+        left: 15px;
+        z-index: 9999;
+        background-color: rgba(0,0,0,0.6);
+        color: white;
+        border: none;
+        padding: 10px 15px;
+        border-radius: 8px;
+        font-size: 18px;
+        cursor: pointer;
+    }}
+
+    .menu-btn:hover {{
+        background-color: rgba(255,255,255,0.2);
     }}
     </style>
+
+    <script>
+    function triggerSidebar() {{
+        window.parent.postMessage({{ type: 'streamlit:toggleSidebar' }}, '*');
+    }}
+    </script>
+
+    <button class="menu-btn" onclick="triggerSidebar()">☰</button>
     """,
     unsafe_allow_html=True
 )
+
+# Sidebar content (acts like popup)
+with st.sidebar:
+    st.header("📬 Help Menu")
+    st.markdown("Need assistance?")
+    st.markdown("📧 **Email:** [sit23cs078@sairamtap.edu.in](mailto:sit23cs078@sairamtap.edu.in)")
 
 # Title
 st.title("🦶 Thermal Ulcer Detection")
