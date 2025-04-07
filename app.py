@@ -92,7 +92,17 @@ if uploaded_file is not None:
         prediction = model.predict(processed_image)[0][0]
 
     # Display result
-    if prediction > 0.7:
-        st.error("⚠️ Prediction: Foot ulcer detected!")
-    else:
-        st.success("✅ Prediction: No foot ulcer detected!")
+        # Prediction block with custom dark styling
+    prediction_text = "⚠️ Prediction: Foot ulcer detected!" if prediction > 0.7 else "✅ Prediction: No foot ulcer detected!"
+    bg_color = "#2b2b2b"  # Dark background
+    text_color = "#ffffff"  # White text
+
+    st.markdown(
+        f"""
+        <div style='background-color: {bg_color}; padding: 20px; border-radius: 10px; color: {text_color}; font-size: 18px;'>
+            {prediction_text}
+        </div>
+        """,
+        unsafe_allow_html=True
+    )
+
