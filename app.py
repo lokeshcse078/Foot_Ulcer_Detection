@@ -92,7 +92,7 @@ if uploaded_file is not None:
         prediction = model.predict(processed_image)[0][0]
 
     # Display result
-    if prediction > 0.5:
+    if prediction > 0.7:
         st.error("⚠️ Prediction: Foot ulcer detected!")
     else:
         st.success("✅ Prediction: No foot ulcer detected!")
