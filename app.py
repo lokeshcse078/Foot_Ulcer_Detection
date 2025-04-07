@@ -56,8 +56,13 @@ st.markdown(
 
 
 # Title
-st.title("🦶 Thermal Ulcer Detection")
-st.write("Upload a thermal image to check if a foot ulcer is detected.")
+st.markdown("""
+<div style='background-color: #2b2b2b; padding: 20px; border-radius: 10px; color: white;'>
+    <h1 style='margin-bottom: 10px;'>🦶 Thermal Ulcer Detection</h1>
+    <p style='font-size: 18px;'>Upload a thermal image to check if a foot ulcer is detected.</p>
+</div>
+""", unsafe_allow_html=True)
+
 
 # Download the model if not already present
 @st.cache_resource
