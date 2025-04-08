@@ -18,7 +18,7 @@ import base64
 MODEL_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/releases/download/v1.0/model.h5"
 MODEL_PATH = "model.h5"
 IMG_SIZE = (224, 224)
-DB_URL = "https://raw.githubusercontent.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/users.db"
+DB_URL = "https://raw.githubusercontent.com/lokeshcse078/Foot_Ulcer_Detection/main/users.db"
 
   # Update with the correct URL
 DB_PATH = "users.db"
@@ -27,7 +27,7 @@ DB_PATH = "users.db"
 BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/bg.jpg"  # Update with the actual image URL
 
 # GitHub token (use environment variable for security)
-GITHUB_TOKEN = "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"
+GITHUB_TOKEN = "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"
 # Email credentials (replace with env vars ideally)
 EMAIL_USER = "lokeshkumar.cse.078@gmail.com"
 EMAIL_PASS = "wwpo fizj fhxp wbbp"  # Replace this with a secure method
