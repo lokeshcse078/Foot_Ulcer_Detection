@@ -85,9 +85,13 @@ EMAIL_PASS = "wwpo fizj fhxp wbbp"  # Replace this with a secure method
 def send_otp(email):
     otp = str(random.randint(100000, 999999))
     expiry = datetime.now() + timedelta(minutes=5)
-    conn = sqlite3.connect(DB_PATH)
+    
+    # Convert expiry to string in a format compatible with SQLite
+    expiry_str = expiry.strftime("%Y-%m-%d %H:%M:%S")
+
+    conn = sqlite3.connect("users.db")
     c = conn.cursor()
-    c.execute("INSERT INTO otp_codes (email, otp, expiry) VALUES (?, ?, ?)", (email, otp, expiry))
+    c.execute("INSERT INTO otp_codes (email, otp, expiry) VALUES (?, ?, ?)", (email, otp, expiry_str))
     conn.commit()
     conn.close()
 
