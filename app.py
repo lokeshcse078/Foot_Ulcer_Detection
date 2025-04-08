@@ -26,6 +26,10 @@ BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blo
 
 # GitHub token (use environment variable for security)
 GITHUB_TOKEN = "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"
+# Email credentials (replace with env vars ideally)
+EMAIL_USER = "lokeshkumar.cse.078@gmail.com"
+EMAIL_PASS = "wwpo fizj fhxp wbbp"  # Replace this with a secure method
+
 
 # Download the model if not already present
 @st.cache_resource
@@ -52,7 +56,7 @@ def preprocess_image(image):
 def download_db():
     if not os.path.exists(DB_PATH):
         with st.spinner("🔄 Downloading database..."):
-            response = requests.get(DB_URL)
+            response = requests.get(DB_URL, headers={'Authorization': f'token {GITHUB_TOKEN}'})
             with open(DB_PATH, "wb") as f:
                 f.write(response.content)
 
@@ -82,9 +86,6 @@ def create_db():
 
 create_db()
 
-# Email credentials (replace with env vars ideally)
-EMAIL_USER = "lokeshkumar.cse.078@gmail.com"
-EMAIL_PASS = "wwpo fizj fhxp wbbp"  # Replace this with a secure method
 
 def send_otp(email):
     otp = str(random.randint(100000, 999999))
@@ -167,22 +168,27 @@ def update_github_db(email, hashed_password):
 
     # Get the current file content (required for sha)
     response = requests.get(DB_URL, headers=headers)
-    file_sha = response.json()['sha']
+    if response.status_code != 200:
+        st.error(f"Error fetching file from GitHub: {response.text}")
+        return
+
+    try:
+        file_sha = response.json()['sha']
+        current_db_content = base64.b64decode(response.json()['content']).decode('utf-8')
+    except KeyError as e:
+        st.error(f"Error processing GitHub response: {e}")
+        return
 
     # Prepare the new content for the file
     new_content = {
         "email": email,
         "password": hashed_password
     }
-    # Read the current file and append the new user (assuming JSON format here, adjust according to your actual DB format)
-    current_db_content = response.json().get('content', '')
-    current_db_decoded = base64.b64decode(current_db_content).decode('utf-8')
-
-    # Append new user to the DB content (this is a simplified approach for demo purposes)
-    current_db_decoded += f"\n{new_content}"
+    current_db_decoded = json.loads(current_db_content)
+    current_db_decoded.append(new_content)
 
     # Re-encode the content to base64
-    updated_content = base64.b64encode(current_db_decoded.encode()).decode()
+    updated_content = base64.b64encode(json.dumps(current_db_decoded).encode()).decode()
 
     # Prepare the data for the GitHub API
     data = {
@@ -262,7 +268,6 @@ if not st.session_state.logged_in:
                     st.rerun()
                 else:
                     st.error("Invalid credentials.")
-
     else:
         email = st.session_state.get("temp_email", "")
         otp = st.text_input("Enter OTP")
@@ -296,4 +301,3 @@ else:
             st.error("Prediction: Foot ulcer detected! ⚠️")
         else:
             st.success("Prediction: No foot ulcer detected ✅")
-
