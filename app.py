@@ -20,6 +20,9 @@ IMG_SIZE = (224, 224)
 DB_URL = "https://raw.githubusercontent.com/your-username/your-repository/main/users.db"  # Update with the correct URL
 DB_PATH = "users.db"
 
+# Background image URL (change this to the URL of your background image)
+BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/bg.jpg"  # Update with the actual image URL
+
 # Download the model if not already present
 @st.cache_resource
 def download_model():
@@ -146,6 +149,20 @@ def verify_otp(email, otp):
         if stored_otp == otp and datetime.now() < expiry_datetime:
             return True
     return False
+
+# Inject custom CSS for background image
+st.markdown(
+    f"""
+    <style>
+    .stApp {{
+        background-image: url("{BACKGROUND_IMAGE_URL}");
+        background-size: cover;
+        background-position: center;
+    }}
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 # UI
 st.title("Thermal Foot Ulcer Detection")
