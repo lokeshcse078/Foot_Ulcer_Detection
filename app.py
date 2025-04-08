@@ -167,68 +167,75 @@ def register_user(email, password):
         conn.close()
 
 def verify_otp(email, otp):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT otp, expiry FROM otp_codes WHERE email = ? ORDER BY expiry DESC LIMIT 1", (email,))
-    result = c.fetchone()
-    conn.close()
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("SELECT otp, expiry FROM otp_codes WHERE email = ? ORDER BY expiry DESC LIMIT 1", (email,))
+        result = c.fetchone()
+        conn.close()
 
-    if result:
-        stored_otp, expiry = result
-        try:
-            expiry_datetime = datetime.strptime(expiry, "%Y-%m-%d %H:%M:%S.%f")
-        except ValueError:
-            expiry_datetime = datetime.strptime(expiry, "%Y-%m-%d %H:%M:%S")
-        if stored_otp == otp and datetime.now() < expiry_datetime:
-            return True
-    return False
+        if result:
+            stored_otp, expiry = result
+            try:
+                expiry_datetime = datetime.strptime(expiry, "%Y-%m-%d %H:%M:%S.%f")
+            except ValueError:
+                expiry_datetime = datetime.strptime(expiry, "%Y-%m-%d %H:%M:%S")
+            if stored_otp == otp and datetime.now() < expiry_datetime:
+                return True
+        return False
+    except Exception as e:
+        st.error(f"Error verifying OTP: {e}")
+        st.write("Error details:", e)
 
 def update_github_db(email, hashed_password):
-    headers = {
-        'Authorization': f'token {GITHUB_TOKEN}',
-        'Accept': 'application/vnd.github.v3+json'
-    }
+    try:
+        headers = {
+            'Authorization': f'token {GITHUB_TOKEN}',
+            'Accept': 'application/vnd.github.v3+json'
+        }
 
-    # Direct URL to the raw file
-    DB_URL = "https://raw.githubusercontent.com/your-username/your-repository/main/users.db"  # Replace with the correct URL
+        DB_URL = "https://raw.githubusercontent.com/lokeshcse078/Foot_Ulcer_Detection/main/users.db"  # Corrected URL
+        
+        # Fetch the current file content
+        response = requests.get(DB_URL)
+        
+        # Debugging: Log the response content and status
+        if response.status_code != 200:
+            st.error(f"Failed to fetch GitHub DB. HTTP Status: {response.status_code}")
+            st.write("Response content:", response.text)
+            return
 
-    # Fetch the current file content
-    response = requests.get(DB_URL)
+        decoded_content = response.text
+        new_user_entry = f"{email},{hashed_password.decode()}"
+        updated_content = decoded_content + "\n" + new_user_entry
+        
+        # Log the updated content
+        st.write("Updated Content to Push:", updated_content)
 
-    if response.status_code == 200:
-        try:
-            # Decode the content of the file (plain text format)
-            decoded_content = response.text
+        updated_content_b64 = base64.b64encode(updated_content.encode()).decode()
 
-            # Append the new user entry
-            new_user_entry = f"{email},{hashed_password.decode()}"
-            updated_content = decoded_content + "\n" + new_user_entry
+        # Prepare the data for the GitHub API to update the file
+        data = {
+            "message": "Register new user",
+            "committer": {
+                "name": "Your Name",
+                "email": "your-email@example.com"
+            },
+            "content": updated_content_b64,
+            "sha": file_sha  # Fetch the correct sha if needed
+        }
 
-            # Re-encode the content to base64
-            updated_content_b64 = base64.b64encode(updated_content.encode()).decode()
+        # Send the PUT request to update the file on GitHub
+        update_response = requests.put(DB_URL, json=data, headers=headers)
 
-            # Prepare the data for the GitHub API to update the file
-            data = {
-                "message": "Register new user",
-                "committer": {
-                    "name": "Your Name",
-                    "email": "your-email@example.com"
-                },
-                "content": updated_content_b64,
-                "sha": file_sha  # Make sure to fetch the correct sha in case it's a new commit
-            }
+        if update_response.status_code == 200:
+            st.success("User registered and database updated on GitHub!")
+        else:
+            st.error(f"Error updating GitHub DB: {update_response.text}")
+    except Exception as e:
+        st.error(f"Error updating GitHub DB: {e}")
+        st.write("Error details:", e)
 
-            # Send the PUT request to update the file on GitHub
-            update_response = requests.put(DB_URL, json=data, headers=headers)
-
-            if update_response.status_code == 200:
-                st.success("User registered and database updated on GitHub!")
-            else:
-                st.error(f"Error updating GitHub DB: {update_response.text}")
-        except Exception as e:
-            st.error(f"Error processing database: {e}")
-    else:
-        st.error(f"GitHub API Error: {response.status_code} - {response.text}")
 
 
 # Inject custom CSS for background image
