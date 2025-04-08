@@ -25,7 +25,7 @@ DB_PATH = "users.db"
 BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/bg.jpg"  # Update with the actual image URL
 
 # GitHub token (use environment variable for security)
-GITHUB_TOKEN = "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"
+GITHUB_TOKEN = "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"
 # Email credentials (replace with env vars ideally)
 EMAIL_USER = "lokeshkumar.cse.078@gmail.com"
 EMAIL_PASS = "wwpo fizj fhxp wbbp"  # Replace this with a secure method
