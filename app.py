@@ -119,6 +119,7 @@ def verify_user_from_github(email, password):
         st.error(f"GitHub API Error: {response.status_code} - {response.text}")
         return False
 
+
 def send_otp(email):
     otp = str(random.randint(100000, 999999))
     expiry = datetime.now() + timedelta(minutes=5)
