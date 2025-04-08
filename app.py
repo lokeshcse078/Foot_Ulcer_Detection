@@ -88,23 +88,19 @@ create_db()
 
 # Function to verify password from GitHub DB
 def verify_user_from_github(email, password):
-    headers = {
-        'Authorization': f'token {GITHUB_TOKEN}',
-        'Accept': 'application/vnd.github.v3+json'
-    }
-
-    # Get the content of the DB file from GitHub
-    response = requests.get(DB_URL, headers=headers)
-
+    # Direct URL to the raw file
+    DB_URL = "https://raw.githubusercontent.com/your-username/your-repository/main/users.db"  # Update with correct URL
+    
+    # Make a simple GET request to fetch the file content
+    response = requests.get(DB_URL)
+    
     if response.status_code == 200:
         try:
-            # Decode the file content from base64
-            response_json = response.json()
-            content_b64 = response_json.get('content', '')
-            decoded_content = base64.b64decode(content_b64).decode('utf-8')
-
-            # Parse the decoded content to search for the user data
-            users = decoded_content.split('\n')  # Assuming each user is on a new line
+            # Decode the content of the file
+            decoded_content = response.text
+            
+            # Parse the decoded content (assuming CSV format)
+            users = decoded_content.split('\n')  # Each user is assumed to be on a new line
             for user in users:
                 user_data = user.strip()
                 if user_data:
@@ -116,7 +112,7 @@ def verify_user_from_github(email, password):
             st.error(f"Error processing database: {e}")
             return False
     else:
-        st.error(f"GitHub API Error: {response.status_code} - {response.text}")
+        st.error(f"GitHub Error: {response.status_code} - {response.text}")
         return False
 
 
@@ -188,25 +184,25 @@ def update_github_db(email, hashed_password):
         'Accept': 'application/vnd.github.v3+json'
     }
 
-    # Get the current file content (required for sha)
-    response = requests.get(DB_URL, headers=headers)
+    # Direct URL to the raw file
+    DB_URL = "https://raw.githubusercontent.com/your-username/your-repository/main/users.db"  # Replace with the correct URL
+
+    # Fetch the current file content
+    response = requests.get(DB_URL)
 
     if response.status_code == 200:
         try:
-            # Decode the file content from base64
-            response_json = response.json()
-            file_sha = response_json.get('sha')
-            content_b64 = response_json.get('content', '')
-            decoded_content = base64.b64decode(content_b64).decode('utf-8')
+            # Decode the content of the file (plain text format)
+            decoded_content = response.text
 
-            # Append new user to the DB content
+            # Append the new user entry
             new_user_entry = f"{email},{hashed_password.decode()}"
             updated_content = decoded_content + "\n" + new_user_entry
 
             # Re-encode the content to base64
             updated_content_b64 = base64.b64encode(updated_content.encode()).decode()
 
-            # Prepare the data for the GitHub API
+            # Prepare the data for the GitHub API to update the file
             data = {
                 "message": "Register new user",
                 "committer": {
@@ -214,7 +210,7 @@ def update_github_db(email, hashed_password):
                     "email": "your-email@example.com"
                 },
                 "content": updated_content_b64,
-                "sha": file_sha
+                "sha": file_sha  # Make sure to fetch the correct sha in case it's a new commit
             }
 
             # Send the PUT request to update the file on GitHub
