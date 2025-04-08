@@ -179,12 +179,27 @@ if not st.session_state.logged_in:
         if auth_option == "Register":
             email = st.text_input("Email")
             password = st.text_input("Password", type="password")
+    
+            # Check if email format is valid (basic check)
+            if "@" not in email or "." not in email:
+                st.warning("Please enter a valid email address.")
+        
             if st.button("Send OTP"):
-                send_otp(email)
-                st.session_state.registering = True
-                st.session_state.temp_email = email
-                st.session_state.temp_password = password
-                st.rerun()
+                # Ensure that email is not empty and is valid
+                if email and "@" in email and "." in email:
+                    # Call the send_otp function
+                    if send_otp(email):
+                        # Store email and password temporarily in session state for later use
+                        st.session_state.registering = True
+                        st.session_state.temp_email = email
+                        st.session_state.temp_password = password
+                        st.success("OTP has been sent to your email!")
+                        st.rerun()  # Re-run the app to allow OTP input
+                    else:
+                        st.error("Failed to send OTP. Please try again.")
+                else:
+                    st.warning("Please enter a valid email address.")
+
 
         elif auth_option == "Login":
             email = st.text_input("Email")
@@ -213,7 +228,7 @@ else:
     st.success("Logged in successfully!")
     if st.button("Logout"):
         st.session_state.logged_in = False
-        st.experimental_rerun()
+        st.rerun()
 
     uploaded_file = st.file_uploader("Upload thermal image...", type=["jpg", "jpeg", "png"])
     if uploaded_file:
