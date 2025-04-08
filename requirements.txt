@@ -1,9 +1,9 @@
 streamlit==1.32.2
-Pillow==10.1.0
 tensorflow==2.16.1
 numpy==1.26.4
+Pillow==10.1.0
 requests==2.31.0
 bcrypt==4.0.1
-sqlite3
+
 
 
