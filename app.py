@@ -19,6 +19,7 @@ MODEL_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/releases/downl
 MODEL_PATH = "model.h5"
 IMG_SIZE = (224, 224)
 DB_URL = "https://raw.githubusercontent.com/lokeshcse078/Foot_Ulcer_Detection/main/users.db"
+
   # Update with the correct URL
 DB_PATH = "users.db"
 
@@ -57,9 +58,12 @@ def preprocess_image(image):
 def download_db():
     if not os.path.exists(DB_PATH):
         with st.spinner("🔄 Downloading database..."):
-            response = requests.get(DB_URL, headers={'Authorization': f'token {GITHUB_TOKEN}'})
-            with open(DB_PATH, "wb") as f:
-                f.write(response.content)
+            response = requests.get(DB_URL)
+            if response.status_code == 200:
+                with open(DB_PATH, "wb") as f:
+                    f.write(response.content)
+            else:
+                st.error(f"Failed to download database. Status Code: {response.status_code}")
 
 # Download the DB at the start of the app
 download_db()
