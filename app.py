@@ -17,6 +17,8 @@ from datetime import datetime, timedelta
 MODEL_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/releases/download/v1.0/model.h5"
 MODEL_PATH = "model.h5"
 IMG_SIZE = (224, 224)
+DB_URL = "https://raw.githubusercontent.com/your-username/your-repository/main/users.db"  # Update with the correct URL
+DB_PATH = "users.db"
 
 # Download the model if not already present
 @st.cache_resource
@@ -39,9 +41,20 @@ def preprocess_image(image):
     image = np.expand_dims(image, axis=0)
     return image
 
+# Function to download the database if not already present
+def download_db():
+    if not os.path.exists(DB_PATH):
+        with st.spinner("🔄 Downloading database..."):
+            response = requests.get(DB_URL)
+            with open(DB_PATH, "wb") as f:
+                f.write(response.content)
+
+# Download the DB at the start of the app
+download_db()
+
 # Database setup
 def create_db():
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("""
         CREATE TABLE IF NOT EXISTS users (
@@ -64,12 +77,12 @@ create_db()
 
 # Email credentials (replace with env vars ideally)
 EMAIL_USER = "lokeshkumar.cse.078@gmail.com"
-EMAIL_PASS = "wwpo fizj fhxp wbbp"
+EMAIL_PASS = "wwpo fizj fhxp wbbp"  # Replace this with a secure method
 
 def send_otp(email):
     otp = str(random.randint(100000, 999999))
     expiry = datetime.now() + timedelta(minutes=5)
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("INSERT INTO otp_codes (email, otp, expiry) VALUES (?, ?, ?)", (email, otp, expiry))
     conn.commit()
@@ -96,7 +109,7 @@ def send_otp(email):
 
 def register_user(email, password):
     hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     try:
         c.execute("INSERT INTO users (email, password) VALUES (?, ?)", (email, hashed_pw))
@@ -108,7 +121,7 @@ def register_user(email, password):
         conn.close()
 
 def verify_user(email, password):
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT password FROM users WHERE email = ?", (email,))
     result = c.fetchone()
@@ -118,7 +131,7 @@ def verify_user(email, password):
     return False
 
 def verify_otp(email, otp):
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("SELECT otp, expiry FROM otp_codes WHERE email = ? ORDER BY expiry DESC LIMIT 1", (email,))
     result = c.fetchone()
