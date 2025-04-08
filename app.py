@@ -18,7 +18,7 @@ import base64
 MODEL_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/releases/download/v1.0/model.h5"
 MODEL_PATH = "model.h5"
 IMG_SIZE = (224, 224)
-DB_URL = "https://raw.githubusercontent.com/your-username/your-repository/main/users.db"  # Update with the correct URL
+DB_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/users.db"  # Update with the correct URL
 DB_PATH = "users.db"
 
 # Background image URL (change this to the URL of your background image)
