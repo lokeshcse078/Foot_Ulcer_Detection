@@ -159,7 +159,6 @@ def verify_otp(email, otp):
             return True
     return False
 
-# GitHub API function to update user.db
 def update_github_db(email, hashed_password):
     headers = {
         'Authorization': f'token {GITHUB_TOKEN}',
@@ -168,27 +167,33 @@ def update_github_db(email, hashed_password):
 
     # Get the current file content (required for sha)
     response = requests.get(DB_URL, headers=headers)
-    if response.status_code != 200:
-        st.error(f"Error fetching file from GitHub: {response.text}")
-        return
+
+    # Log the raw response content to check its format
+    st.write(response.text)  # Or use logging to capture the response
 
     try:
-        file_sha = response.json()['sha']
-        current_db_content = base64.b64decode(response.json()['content']).decode('utf-8')
-    except KeyError as e:
-        st.error(f"Error processing GitHub response: {e}")
+        # Try decoding the response
+        response_json = response.json()
+    except ValueError as e:
+        st.error(f"Error decoding JSON: {e}")
         return
+
+    # Now that we have decoded the JSON, proceed with the logic
+    file_sha = response_json.get('sha')
 
     # Prepare the new content for the file
     new_content = {
         "email": email,
         "password": hashed_password
     }
-    current_db_decoded = json.loads(current_db_content)
-    current_db_decoded.append(new_content)
+    current_db_content = response_json.get('content', '')
+    current_db_decoded = base64.b64decode(current_db_content).decode('utf-8')
+
+    # Append new user to the DB content (this is a simplified approach for demo purposes)
+    current_db_decoded += f"\n{new_content}"
 
     # Re-encode the content to base64
-    updated_content = base64.b64encode(json.dumps(current_db_decoded).encode()).decode()
+    updated_content = base64.b64encode(current_db_decoded.encode()).decode()
 
     # Prepare the data for the GitHub API
     data = {
@@ -203,11 +208,12 @@ def update_github_db(email, hashed_password):
 
     # Send the PUT request to update the file on GitHub
     update_response = requests.put(DB_URL, json=data, headers=headers)
-    
+
     if update_response.status_code == 200:
         st.success("User registered and database updated!")
     else:
         st.error(f"Error updating GitHub DB: {update_response.text}")
+
 
 # Inject custom CSS for background image
 st.markdown(
