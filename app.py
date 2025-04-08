@@ -12,6 +12,7 @@ import sqlite3
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
+import base64
 
 # Constants
 MODEL_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/releases/download/v1.0/model.h5"
@@ -22,6 +23,9 @@ DB_PATH = "users.db"
 
 # Background image URL (change this to the URL of your background image)
 BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/bg.jpg"  # Update with the actual image URL
+
+# GitHub token (use environment variable for security)
+GITHUB_TOKEN = "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"
 
 # Download the model if not already present
 @st.cache_resource
@@ -154,6 +158,51 @@ def verify_otp(email, otp):
             return True
     return False
 
+# GitHub API function to update user.db
+def update_github_db(email, hashed_password):
+    headers = {
+        'Authorization': f'token {GITHUB_TOKEN}',
+        'Accept': 'application/vnd.github.v3+json'
+    }
+
+    # Get the current file content (required for sha)
+    response = requests.get(DB_URL, headers=headers)
+    file_sha = response.json()['sha']
+
+    # Prepare the new content for the file
+    new_content = {
+        "email": email,
+        "password": hashed_password
+    }
+    # Read the current file and append the new user (assuming JSON format here, adjust according to your actual DB format)
+    current_db_content = response.json().get('content', '')
+    current_db_decoded = base64.b64decode(current_db_content).decode('utf-8')
+
+    # Append new user to the DB content (this is a simplified approach for demo purposes)
+    current_db_decoded += f"\n{new_content}"
+
+    # Re-encode the content to base64
+    updated_content = base64.b64encode(current_db_decoded.encode()).decode()
+
+    # Prepare the data for the GitHub API
+    data = {
+        "message": "Register new user",
+        "committer": {
+            "name": "Your Name",
+            "email": "your-email@example.com"
+        },
+        "content": updated_content,
+        "sha": file_sha
+    }
+
+    # Send the PUT request to update the file on GitHub
+    update_response = requests.put(DB_URL, json=data, headers=headers)
+    
+    if update_response.status_code == 200:
+        st.success("User registered and database updated!")
+    else:
+        st.error(f"Error updating GitHub DB: {update_response.text}")
+
 # Inject custom CSS for background image
 st.markdown(
     f"""
@@ -202,9 +251,7 @@ if not st.session_state.logged_in:
                     else:
                         st.error("Failed to send OTP. Please try again.")
                 else:
-                    st.warning("Please enter a valid email address.")
-
-
+                    st.warning("Please enter a valid email address.")        
         elif auth_option == "Login":
             email = st.text_input("Email")
             password = st.text_input("Password", type="password")
@@ -221,7 +268,9 @@ if not st.session_state.logged_in:
         otp = st.text_input("Enter OTP")
         if st.button("Verify OTP"):
             if verify_otp(email, otp):
+                hashed_password = bcrypt.hashpw(st.session_state.temp_password.encode(), bcrypt.gensalt())
                 register_user(email, st.session_state.temp_password)
+                update_github_db(email, hashed_password.decode())  # Update on GitHub
                 st.session_state.logged_in = True
                 st.success("Registration & login successful!")
                 st.session_state.registering = False
@@ -247,3 +296,4 @@ else:
             st.error("Prediction: Foot ulcer detected! ⚠️")
         else:
             st.success("Prediction: No foot ulcer detected ✅")
+
