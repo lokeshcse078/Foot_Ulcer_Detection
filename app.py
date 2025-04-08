@@ -86,6 +86,38 @@ def create_db():
 
 create_db()
 
+# Function to verify password from GitHub DB
+def verify_user_from_github(email, password):
+    headers = {
+        'Authorization': f'token {GITHUB_TOKEN}',
+        'Accept': 'application/vnd.github.v3+json'
+    }
+
+    # Get the content of the DB file from GitHub
+    response = requests.get(DB_URL, headers=headers)
+
+    if response.status_code == 200:
+        try:
+            # Decode the file content from base64
+            response_json = response.json()
+            content_b64 = response_json.get('content', '')
+            decoded_content = base64.b64decode(content_b64).decode('utf-8')
+
+            # Parse the decoded content to search for the user data
+            users = decoded_content.split('\n')  # Assuming each user is on a new line
+            for user in users:
+                user_data = user.strip()
+                if user_data:
+                    stored_email, stored_hashed_password = user_data.split(',')  # Assuming CSV format
+                    if stored_email == email and bcrypt.checkpw(password.encode(), stored_hashed_password.encode()):
+                        return True  # Email and password match
+            return False  # No match found
+        except Exception as e:
+            st.error(f"Error processing database: {e}")
+            return False
+    else:
+        st.error(f"GitHub API Error: {response.status_code} - {response.text}")
+        return False
 
 def send_otp(email):
     otp = str(random.randint(100000, 999999))
@@ -132,16 +164,6 @@ def register_user(email, password):
     finally:
         conn.close()
 
-def verify_user(email, password):
-    conn = sqlite3.connect(DB_PATH)
-    c = conn.cursor()
-    c.execute("SELECT password FROM users WHERE email = ?", (email,))
-    result = c.fetchone()
-    conn.close()
-    if result:
-        return bcrypt.checkpw(password.encode(), result[0])
-    return False
-
 def verify_otp(email, otp):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -168,51 +190,43 @@ def update_github_db(email, hashed_password):
     # Get the current file content (required for sha)
     response = requests.get(DB_URL, headers=headers)
 
-    # Log the raw response content to check its format
-    st.write(response.text)  # Or use logging to capture the response
+    if response.status_code == 200:
+        try:
+            # Decode the file content from base64
+            response_json = response.json()
+            file_sha = response_json.get('sha')
+            content_b64 = response_json.get('content', '')
+            decoded_content = base64.b64decode(content_b64).decode('utf-8')
 
-    try:
-        # Try decoding the response
-        response_json = response.json()
-    except ValueError as e:
-        st.error(f"Error decoding JSON: {e}")
-        return
+            # Append new user to the DB content
+            new_user_entry = f"{email},{hashed_password.decode()}"
+            updated_content = decoded_content + "\n" + new_user_entry
 
-    # Now that we have decoded the JSON, proceed with the logic
-    file_sha = response_json.get('sha')
+            # Re-encode the content to base64
+            updated_content_b64 = base64.b64encode(updated_content.encode()).decode()
 
-    # Prepare the new content for the file
-    new_content = {
-        "email": email,
-        "password": hashed_password
-    }
-    current_db_content = response_json.get('content', '')
-    current_db_decoded = base64.b64decode(current_db_content).decode('utf-8')
+            # Prepare the data for the GitHub API
+            data = {
+                "message": "Register new user",
+                "committer": {
+                    "name": "Your Name",
+                    "email": "your-email@example.com"
+                },
+                "content": updated_content_b64,
+                "sha": file_sha
+            }
 
-    # Append new user to the DB content (this is a simplified approach for demo purposes)
-    current_db_decoded += f"\n{new_content}"
+            # Send the PUT request to update the file on GitHub
+            update_response = requests.put(DB_URL, json=data, headers=headers)
 
-    # Re-encode the content to base64
-    updated_content = base64.b64encode(current_db_decoded.encode()).decode()
-
-    # Prepare the data for the GitHub API
-    data = {
-        "message": "Register new user",
-        "committer": {
-            "name": "Your Name",
-            "email": "your-email@example.com"
-        },
-        "content": updated_content,
-        "sha": file_sha
-    }
-
-    # Send the PUT request to update the file on GitHub
-    update_response = requests.put(DB_URL, json=data, headers=headers)
-
-    if update_response.status_code == 200:
-        st.success("User registered and database updated!")
+            if update_response.status_code == 200:
+                st.success("User registered and database updated on GitHub!")
+            else:
+                st.error(f"Error updating GitHub DB: {update_response.text}")
+        except Exception as e:
+            st.error(f"Error processing database: {e}")
     else:
-        st.error(f"Error updating GitHub DB: {update_response.text}")
+        st.error(f"GitHub API Error: {response.status_code} - {response.text}")
 
 
 # Inject custom CSS for background image
@@ -268,7 +282,7 @@ if not st.session_state.logged_in:
             email = st.text_input("Email")
             password = st.text_input("Password", type="password")
             if st.button("Login"):
-                if verify_user(email, password):
+                if verify_user_from_github(email, password):
                     st.session_state.logged_in = True
                     st.success("Login successful!")
                     st.rerun()
@@ -281,7 +295,7 @@ if not st.session_state.logged_in:
             if verify_otp(email, otp):
                 hashed_password = bcrypt.hashpw(st.session_state.temp_password.encode(), bcrypt.gensalt())
                 register_user(email, st.session_state.temp_password)
-                update_github_db(email, hashed_password.decode())  # Update on GitHub
+                update_github_db(email, hashed_password)  # Update on GitHub
                 st.session_state.logged_in = True
                 st.success("Registration & login successful!")
                 st.session_state.registering = False
