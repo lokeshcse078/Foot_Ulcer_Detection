@@ -218,7 +218,7 @@ else:
     uploaded_file = st.file_uploader("Upload thermal image...", type=["jpg", "jpeg", "png"])
     if uploaded_file:
         image = load_img(uploaded_file)
-        st.image(image, caption="Uploaded Image", use_container_width=True)
+        st.image(image, caption="Uploaded Image", use_column_width=True)
 
         processed = preprocess_image(image)
         prediction = model.predict(processed)[0][0]  # Binary output
