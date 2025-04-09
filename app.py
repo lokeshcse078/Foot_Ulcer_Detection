@@ -28,8 +28,7 @@ EMAIL_PASS = "wwpo fizj fhxp wbbp"
 
 # Google Drive users.txt file ID
 USERS_TXT_FILE_ID = "15k9kmbB5vD7FZsT0cuTJUcphdHv_pvEi"  # Replace with your actual file ID
-USERS_TXT_RAW_URL = f"https://drive.google.com/uc?export=download&id=15k9kmbB5vD7FZsT0cuTJUcphdHv_pvEi
-"
+USERS_TXT_RAW_URL = f"https://drive.google.com/uc?export=download&id=15k9kmbB5vD7FZsT0cuTJUcphdHv_pvEi"
 
 # Download the model
 @st.cache_resource
