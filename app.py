@@ -1,3 +1,4 @@
+# Updated Streamlit app using Google Drive hosted users.txt instead of GitHub DB
 import os
 import requests
 import streamlit as st
@@ -12,28 +13,25 @@ import sqlite3
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from datetime import datetime, timedelta
-import base64
 
 # Constants
 MODEL_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/releases/download/v1.0/model.h5"
 MODEL_PATH = "model.h5"
 IMG_SIZE = (224, 224)
-DB_URL = "https://raw.githubusercontent.com/lokeshcse078/Foot_Ulcer_Detection/main/users.db"
 
-  # Update with the correct URL
-DB_PATH = "users.db"
+# Background image URL
+BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/bg.jpg"
 
-# Background image URL (change this to the URL of your background image)
-BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/bg.jpg"  # Update with the actual image URL
-
-# GitHub token (use environment variable for security)
-GITHUB_TOKEN = "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"
-# Email credentials (replace with env vars ideally)
+# Email credentials
 EMAIL_USER = "lokeshkumar.cse.078@gmail.com"
-EMAIL_PASS = "wwpo fizj fhxp wbbp"  # Replace this with a secure method
+EMAIL_PASS = "wwpo fizj fhxp wbbp"
 
+# Google Drive users.txt file ID
+USERS_TXT_FILE_ID = "15k9kmbB5vD7FZsT0cuTJUcphdHv_pvEi"  # Replace with your actual file ID
+USERS_TXT_RAW_URL = f"https://drive.google.com/uc?export=download&id=15k9kmbB5vD7FZsT0cuTJUcphdHv_pvEi
+"
 
-# Download the model if not already present
+# Download the model
 @st.cache_resource
 def download_model():
     if not os.path.exists(MODEL_PATH):
@@ -44,7 +42,6 @@ def download_model():
     model = tf.keras.models.load_model(MODEL_PATH)
     return model
 
-# Load model
 model = download_model()
 
 # Preprocess image
@@ -54,31 +51,32 @@ def preprocess_image(image):
     image = np.expand_dims(image, axis=0)
     return image
 
-# Function to download the database if not already present
-def download_db():
-    if not os.path.exists(DB_PATH):
-        with st.spinner("🔄 Downloading database..."):
-            response = requests.get(DB_URL)
-            if response.status_code == 200:
-                with open(DB_PATH, "wb") as f:
-                    f.write(response.content)
-            else:
-                st.error(f"Failed to download database. Status Code: {response.status_code}")
+# Read users from Google Drive text file
+def fetch_users():
+    response = requests.get(USERS_TXT_RAW_URL)
+    if response.status_code == 200:
+        lines = response.text.strip().split('\n')
+        users = [line.split(',') for line in lines if line.strip()]
+        return users
+    else:
+        st.error(f"Failed to fetch user data: {response.status_code}")
+        return []
 
-# Download the DB at the start of the app
-download_db()
+# Verify login
 
-# Database setup
-def create_db():
+def verify_user(email, password):
+    users = fetch_users()
+    for stored_email, stored_hash in users:
+        if stored_email == email and bcrypt.checkpw(password.encode(), stored_hash.encode()):
+            return True
+    return False
+
+# OTP
+DB_PATH = "users_local.db"
+
+def create_otp_table():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    c.execute(""" 
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE,
-            password TEXT
-        )
-    """)
     c.execute("""
         CREATE TABLE IF NOT EXISTS otp_codes (
             email TEXT,
@@ -89,46 +87,14 @@ def create_db():
     conn.commit()
     conn.close()
 
-create_db()
-
-# Function to verify password from GitHub DB
-def verify_user_from_github(email, password):
-    # Direct URL to the raw file
-    DB_URL = "https://raw.githubusercontent.com/your-username/your-repository/main/users.db"  # Update with correct URL
-    
-    # Make a simple GET request to fetch the file content
-    response = requests.get(DB_URL)
-    
-    if response.status_code == 200:
-        try:
-            # Decode the content of the file
-            decoded_content = response.text
-            
-            # Parse the decoded content (assuming CSV format)
-            users = decoded_content.split('\n')  # Each user is assumed to be on a new line
-            for user in users:
-                user_data = user.strip()
-                if user_data:
-                    stored_email, stored_hashed_password = user_data.split(',')  # Assuming CSV format
-                    if stored_email == email and bcrypt.checkpw(password.encode(), stored_hashed_password.encode()):
-                        return True  # Email and password match
-            return False  # No match found
-        except Exception as e:
-            st.error(f"Error processing database: {e}")
-            return False
-    else:
-        st.error(f"GitHub Error: {response.status_code} - {response.text}")
-        return False
-
+create_otp_table()
 
 def send_otp(email):
     otp = str(random.randint(100000, 999999))
     expiry = datetime.now() + timedelta(minutes=5)
-    
-    # Convert expiry to string in a format compatible with SQLite
     expiry_str = expiry.strftime("%Y-%m-%d %H:%M:%S")
 
-    conn = sqlite3.connect("users.db")
+    conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute("INSERT INTO otp_codes (email, otp, expiry) VALUES (?, ?, ?)", (email, otp, expiry_str))
     conn.commit()
@@ -153,106 +119,30 @@ def send_otp(email):
         st.error(f"Error sending OTP: {e}")
         return False
 
-def register_user(email, password):
-    hashed_pw = bcrypt.hashpw(password.encode(), bcrypt.gensalt())
+def verify_otp(email, otp):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
-    try:
-        c.execute("INSERT INTO users (email, password) VALUES (?, ?)", (email, hashed_pw))
-        conn.commit()
-        return True
-    except sqlite3.IntegrityError:
-        return False
-    finally:
-        conn.close()
+    c.execute("SELECT otp, expiry FROM otp_codes WHERE email = ? ORDER BY expiry DESC LIMIT 1", (email,))
+    result = c.fetchone()
+    conn.close()
+    if result:
+        stored_otp, expiry = result
+        expiry_datetime = datetime.strptime(expiry, "%Y-%m-%d %H:%M:%S")
+        if stored_otp == otp and datetime.now() < expiry_datetime:
+            return True
+    return False
 
-def verify_otp(email, otp):
-    try:
-        conn = sqlite3.connect(DB_PATH)
-        c = conn.cursor()
-        c.execute("SELECT otp, expiry FROM otp_codes WHERE email = ? ORDER BY expiry DESC LIMIT 1", (email,))
-        result = c.fetchone()
-        conn.close()
-
-        if result:
-            stored_otp, expiry = result
-            try:
-                expiry_datetime = datetime.strptime(expiry, "%Y-%m-%d %H:%M:%S.%f")
-            except ValueError:
-                expiry_datetime = datetime.strptime(expiry, "%Y-%m-%d %H:%M:%S")
-            if stored_otp == otp and datetime.now() < expiry_datetime:
-                return True
-        return False
-    except Exception as e:
-        st.error(f"Error verifying OTP: {e}")
-        st.write("Error details:", e)
-
-def update_github_db(email, hashed_password):
-    try:
-        headers = {
-            'Authorization': f'token {GITHUB_TOKEN}',
-            'Accept': 'application/vnd.github.v3+json'
-        }
-
-        DB_URL = "https://raw.githubusercontent.com/lokeshcse078/Foot_Ulcer_Detection/main/users.db"  # Corrected URL
-        
-        # Fetch the current file content
-        response = requests.get(DB_URL)
-        
-        # Debugging: Log the response content and status
-        if response.status_code != 200:
-            st.error(f"Failed to fetch GitHub DB. HTTP Status: {response.status_code}")
-            st.write("Response content:", response.text)
-            return
-
-        decoded_content = response.text
-        new_user_entry = f"{email},{hashed_password.decode()}"
-        updated_content = decoded_content + "\n" + new_user_entry
-        
-        # Log the updated content
-        st.write("Updated Content to Push:", updated_content)
-
-        updated_content_b64 = base64.b64encode(updated_content.encode()).decode()
-
-        # Prepare the data for the GitHub API to update the file
-        data = {
-            "message": "Register new user",
-            "committer": {
-                "name": "Your Name",
-                "email": "your-email@example.com"
-            },
-            "content": updated_content_b64,
-            "sha": file_sha  # Fetch the correct sha if needed
-        }
-
-        # Send the PUT request to update the file on GitHub
-        update_response = requests.put(DB_URL, json=data, headers=headers)
-
-        if update_response.status_code == 200:
-            st.success("User registered and database updated on GitHub!")
-        else:
-            st.error(f"Error updating GitHub DB: {update_response.text}")
-    except Exception as e:
-        st.error(f"Error updating GitHub DB: {e}")
-        st.write("Error details:", e)
-
-
-
-# Inject custom CSS for background image
-st.markdown(
-    f"""
+# UI Styling
+st.markdown(f"""
     <style>
     .stApp {{
-        background-image: url("{BACKGROUND_IMAGE_URL}");
+        background-image: url('{BACKGROUND_IMAGE_URL}');
         background-size: cover;
         background-position: center;
     }}
     </style>
-    """,
-    unsafe_allow_html=True,
-)
+""", unsafe_allow_html=True)
 
-# UI
 st.title("Thermal Foot Ulcer Detection")
 
 if "logged_in" not in st.session_state:
@@ -267,31 +157,22 @@ if not st.session_state.logged_in:
         if auth_option == "Register":
             email = st.text_input("Email")
             password = st.text_input("Password", type="password")
-    
-            # Check if email format is valid (basic check)
+
             if "@" not in email or "." not in email:
                 st.warning("Please enter a valid email address.")
-        
+
             if st.button("Send OTP"):
-                # Ensure that email is not empty and is valid
-                if email and "@" in email and "." in email:
-                    # Call the send_otp function
-                    if send_otp(email):
-                        # Store email and password temporarily in session state for later use
-                        st.session_state.registering = True
-                        st.session_state.temp_email = email
-                        st.session_state.temp_password = password
-                        st.success("OTP has been sent to your email!")
-                        st.rerun()  # Re-run the app to allow OTP input
-                    else:
-                        st.error("Failed to send OTP. Please try again.")
-                else:
-                    st.warning("Please enter a valid email address.")        
+                if email and send_otp(email):
+                    st.session_state.temp_email = email
+                    st.session_state.temp_password = password
+                    st.session_state.registering = True
+                    st.success("OTP sent to your email.")
+                    st.rerun()
         elif auth_option == "Login":
             email = st.text_input("Email")
             password = st.text_input("Password", type="password")
             if st.button("Login"):
-                if verify_user_from_github(email, password):
+                if verify_user(email, password):
                     st.session_state.logged_in = True
                     st.success("Login successful!")
                     st.rerun()
@@ -302,11 +183,10 @@ if not st.session_state.logged_in:
         otp = st.text_input("Enter OTP")
         if st.button("Verify OTP"):
             if verify_otp(email, otp):
-                hashed_password = bcrypt.hashpw(st.session_state.temp_password.encode(), bcrypt.gensalt())
-                register_user(email, st.session_state.temp_password)
-                update_github_db(email, hashed_password)  # Update on GitHub
+                hashed_pw = bcrypt.hashpw(st.session_state.temp_password.encode(), bcrypt.gensalt()).decode()
+                # Append to users.txt manually in Drive
+                st.success("Registration successful. Please ask admin to add you to users.txt.")
                 st.session_state.logged_in = True
-                st.success("Registration & login successful!")
                 st.session_state.registering = False
                 st.rerun()
             else:
@@ -323,7 +203,7 @@ else:
         st.image(image, caption="Uploaded Image", use_column_width=True)
 
         processed = preprocess_image(image)
-        prediction = model.predict(processed)[0][0]  # Binary output
+        prediction = model.predict(processed)[0][0]
 
         st.subheader("Prediction Result")
         if prediction > 0.5:
