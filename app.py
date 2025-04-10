@@ -1,18 +1,16 @@
-# Updated Streamlit app using Google Drive hosted users.txt instead of GitHub DB
 import os
 import requests
 import streamlit as st
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.preprocessing.image import load_img, img_to_array
-from PIL import Image
-import smtplib
-import random
-import bcrypt
-import sqlite3
+from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime, timedelta
+import smtplib
+import random
+import sqlite3
+
 
 # Constants
 MODEL_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/releases/download/v1.0/model.h5"
@@ -26,11 +24,6 @@ BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blo
 EMAIL_USER = "lokeshkumar.cse.078@gmail.com"
 EMAIL_PASS = "wwpo fizj fhxp wbbp"
 
-# Google Drive users.txt file ID
-USERS_TXT_FILE_ID = "15k9kmbB5vD7FZsT0cuTJUcphdHv_pvEi"  # Replace with your actual file ID
-USERS_TXT_RAW_URL = f"https://drive.google.com/uc?export=download&id=15k9kmbB5vD7FZsT0cuTJUcphdHv_pvEi"
-
-# Download the model
 @st.cache_resource
 def download_model():
     if not os.path.exists(MODEL_PATH):
@@ -43,36 +36,14 @@ def download_model():
 
 model = download_model()
 
-# Preprocess image
+# Image preprocessing
 def preprocess_image(image):
     image = image.resize(IMG_SIZE)
     image = img_to_array(image) / 255.0
     image = np.expand_dims(image, axis=0)
     return image
 
-# Read users from Google Drive text file
-def fetch_users():
-    response = requests.get(USERS_TXT_RAW_URL)
-    if response.status_code == 200:
-        lines = response.text.strip().split('\n')
-        users = [line.split(',') for line in lines if line.strip()]
-        return users
-    else:
-        st.error(f"Failed to fetch user data: {response.status_code}")
-        return []
-
-# Verify login
-
-def verify_user(email, password):
-    users = fetch_users()
-    for stored_email, stored_hash in users:
-        if stored_email == email and bcrypt.checkpw(password.encode(), stored_hash.encode()):
-            return True
-    return False
-
-# OTP
-DB_PATH = "users_local.db"
-
+# OTP database setup
 def create_otp_table():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -88,6 +59,7 @@ def create_otp_table():
 
 create_otp_table()
 
+# Send OTP to email
 def send_otp(email):
     otp = str(random.randint(100000, 999999))
     expiry = datetime.now() + timedelta(minutes=5)
@@ -118,6 +90,7 @@ def send_otp(email):
         st.error(f"Error sending OTP: {e}")
         return False
 
+# Verify OTP
 def verify_otp(email, otp):
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
@@ -144,56 +117,41 @@ st.markdown(f"""
 
 st.title("Thermal Foot Ulcer Detection")
 
+# Session State Management
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
-if "registering" not in st.session_state:
-    st.session_state.registering = False
+if "email" not in st.session_state:
+    st.session_state.email = ""
 
+# OTP Login Flow
 if not st.session_state.logged_in:
-    if not st.session_state.registering:
-        auth_option = st.radio("Select option:", ["Register", "Login"])
-
-        if auth_option == "Register":
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-
-            if "@" not in email or "." not in email:
-                st.warning("Please enter a valid email address.")
-
-            if st.button("Send OTP"):
-                if email and send_otp(email):
-                    st.session_state.temp_email = email
-                    st.session_state.temp_password = password
-                    st.session_state.registering = True
+    if not st.session_state.email:
+        email = st.text_input("Enter your email")
+        if st.button("Send OTP"):
+            if "@" in email and "." in email:
+                if send_otp(email):
+                    st.session_state.email = email
                     st.success("OTP sent to your email.")
                     st.rerun()
-        elif auth_option == "Login":
-            email = st.text_input("Email")
-            password = st.text_input("Password", type="password")
-            if st.button("Login"):
-                if verify_user(email, password):
-                    st.session_state.logged_in = True
-                    st.success("Login successful!")
-                    st.rerun()
-                else:
-                    st.error("Invalid credentials.")
+            else:
+                st.warning("Please enter a valid email address.")
     else:
-        email = st.session_state.get("temp_email", "")
-        otp = st.text_input("Enter OTP")
+        otp = st.text_input("Enter the OTP sent to your email")
         if st.button("Verify OTP"):
-            if verify_otp(email, otp):
-                hashed_pw = bcrypt.hashpw(st.session_state.temp_password.encode(), bcrypt.gensalt()).decode()
-                # Append to users.txt manually in Drive
-                st.success("Registration successful. Please ask admin to add you to users.txt.")
+            if verify_otp(st.session_state.email, otp):
+                st.success("Login successful!")
                 st.session_state.logged_in = True
-                st.session_state.registering = False
                 st.rerun()
             else:
-                st.error("Invalid OTP or expired.")
+                st.error("Invalid OTP or OTP expired.")
+        if st.button("Resend OTP"):
+            send_otp(st.session_state.email)
+            st.success("OTP resent.")
 else:
-    st.success("Logged in successfully!")
+    st.success(f"Welcome, {st.session_state.email}!")
     if st.button("Logout"):
         st.session_state.logged_in = False
+        st.session_state.email = ""
         st.rerun()
 
     uploaded_file = st.file_uploader("Upload thermal image...", type=["jpg", "jpeg", "png"])
