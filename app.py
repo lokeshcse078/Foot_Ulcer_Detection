@@ -11,11 +11,11 @@ import smtplib
 import random
 import sqlite3
 
-
 # Constants
 MODEL_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/releases/download/v1.0/model.h5"
 MODEL_PATH = "model.h5"
 IMG_SIZE = (224, 224)
+DB_FILE = "otp_store.db"
 
 # Background image URL
 BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/bg.jpg"
@@ -36,16 +36,15 @@ def download_model():
 
 model = download_model()
 
-# Image preprocessing
 def preprocess_image(image):
     image = image.resize(IMG_SIZE)
     image = img_to_array(image) / 255.0
     image = np.expand_dims(image, axis=0)
     return image
 
-# OTP database setup
+# Setup OTP table
 def create_otp_table():
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("""
         CREATE TABLE IF NOT EXISTS otp_codes (
@@ -59,13 +58,12 @@ def create_otp_table():
 
 create_otp_table()
 
-# Send OTP to email
 def send_otp(email):
     otp = str(random.randint(100000, 999999))
     expiry = datetime.now() + timedelta(minutes=5)
     expiry_str = expiry.strftime("%Y-%m-%d %H:%M:%S")
 
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("INSERT INTO otp_codes (email, otp, expiry) VALUES (?, ?, ?)", (email, otp, expiry_str))
     conn.commit()
@@ -90,9 +88,8 @@ def send_otp(email):
         st.error(f"Error sending OTP: {e}")
         return False
 
-# Verify OTP
 def verify_otp(email, otp):
-    conn = sqlite3.connect(DB_PATH)
+    conn = sqlite3.connect(DB_FILE)
     c = conn.cursor()
     c.execute("SELECT otp, expiry FROM otp_codes WHERE email = ? ORDER BY expiry DESC LIMIT 1", (email,))
     result = c.fetchone()
