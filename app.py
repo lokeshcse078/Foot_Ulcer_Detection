@@ -107,7 +107,7 @@ if "email" not in st.session_state:
 if not st.session_state.logged_in:
     email = st.text_input("Email")
 
-    user_query = supabase.table("users").select("*").eq("email", email).execute()
+    user_query = supabase.table("user").select("*").eq("email", email).execute()
     user_exists = len(user_query.data) > 0
 
     if user_exists:
