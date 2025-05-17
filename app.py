@@ -48,12 +48,13 @@ def preprocess_image(image):
     return image
 
 # OTP Handling
-otp_store = {}
+if "otp_store" not in st.session_state:
+    st.session_state.otp_store = {}
 
 def send_otp(email):
     otp = str(random.randint(100000, 999999))
     expiry = datetime.now() + timedelta(minutes=5)
-    otp_store[email] = (otp, expiry)
+    st.session_state.otp_store[email] = (otp, expiry)
 
     subject = "Your OTP Code"
     body = f"Your OTP code is {otp}. It is valid for 5 minutes."
@@ -75,11 +76,12 @@ def send_otp(email):
         return False
 
 def verify_otp(email, otp):
-    if email in otp_store:
-        stored_otp, expiry = otp_store[email]
+    if email in st.session_state.otp_store:
+        stored_otp, expiry = st.session_state.otp_store[email]
         if stored_otp == otp and datetime.now() < expiry:
             return True
     return False
+
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
