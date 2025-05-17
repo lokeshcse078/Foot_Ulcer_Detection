@@ -27,7 +27,7 @@ EMAIL_USER = st.secrets["email"]["user"]
 EMAIL_PASS = st.secrets["email"]["pass"]
 
 # Background image
-BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/bg.jpg"
+BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/bg.jpg?raw=true"
 
 @st.cache_resource
 def download_model():
@@ -48,13 +48,12 @@ def preprocess_image(image):
     return image
 
 # OTP Handling
-if "otp_store" not in st.session_state:
-    st.session_state.otp_store = {}
+otp_store = {}
 
 def send_otp(email):
     otp = str(random.randint(100000, 999999))
     expiry = datetime.now() + timedelta(minutes=5)
-    st.session_state.otp_store[email] = (otp, expiry)
+    otp_store[email] = (otp, expiry)
 
     subject = "Your OTP Code"
     body = f"Your OTP code is {otp}. It is valid for 5 minutes."
@@ -76,12 +75,11 @@ def send_otp(email):
         return False
 
 def verify_otp(email, otp):
-    if email in st.session_state.otp_store:
-        stored_otp, expiry = st.session_state.otp_store[email]
+    if email in otp_store:
+        stored_otp, expiry = otp_store[email]
         if stored_otp == otp and datetime.now() < expiry:
             return True
     return False
-
 
 def hash_password(password):
     return hashlib.sha256(password.encode()).hexdigest()
@@ -104,58 +102,78 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 if "email" not in st.session_state:
     st.session_state.email = ""
+if "otp_sent" not in st.session_state:
+    st.session_state.otp_sent = False
+if "otp_verified" not in st.session_state:
+    st.session_state.otp_verified = False
 
 # Authentication
 if not st.session_state.logged_in:
+    auth_mode = st.radio("Select Mode", ["Login", "Register"])
     email = st.text_input("Email")
 
-    user_query = supabase.table("user").select("*").eq("email", email).execute()
-    user_exists = len(user_query.data) > 0
+    if auth_mode == "Login":
+        if email:
+            user_query = supabase.table("users").select("*").eq("email", email).execute()
+            user_exists = len(user_query.data) > 0
 
-    if user_exists:
-        password = st.text_input("Password", type="password")
-        if st.button("Login"):
-            user = user_query.data[0]
-            if hash_password(password) == user["password"]:
-                st.session_state.logged_in = True
-                st.session_state.email = email
-                st.success("Login successful!")
-                st.rerun()
+            if user_exists:
+                password = st.text_input("Password", type="password")
+                if st.button("Login"):
+                    user = user_query.data[0]
+                    if hash_password(password) == user["password"]:
+                        st.session_state.logged_in = True
+                        st.session_state.email = email
+                        st.success("Login successful!")
+                        st.rerun()
+                    else:
+                        st.error("Incorrect password.")
             else:
-                st.error("Incorrect password.")
-    else:
-        if st.button("Send OTP"):
-            if "@" in email and "." in email:
-                if send_otp(email):
-                    st.session_state.email = email
-                    st.success("OTP sent to your email.")
-                    st.rerun()
-            else:
-                st.warning("Please enter a valid email address.")
+                st.warning("No account found. Please register first.")
 
-        if st.session_state.email:
+    elif auth_mode == "Register":
+        if email:
+            if not st.session_state.otp_sent:
+                if st.button("Send OTP"):
+                    if "@" in email and "." in email:
+                        if send_otp(email):
+                            st.session_state.email = email
+                            st.session_state.otp_sent = True
+                            st.success("OTP sent to your email.")
+                            st.rerun()
+                    else:
+                        st.warning("Please enter a valid email address.")
+
+        if st.session_state.otp_sent and not st.session_state.otp_verified:
             otp = st.text_input("Enter OTP sent to your email")
             if st.button("Verify OTP"):
                 if verify_otp(st.session_state.email, otp):
+                    st.session_state.otp_verified = True
                     st.success("OTP verified. Please set a password.")
-                    password = st.text_input("Set Password", type="password")
-                    if st.button("Register"):
-                        supabase.table("users").insert({
-                            "email": st.session_state.email,
-                            "password": hash_password(password),
-                            "created_at": datetime.now().isoformat()
-                        }).execute()
-                        st.success("User registered successfully!")
-                        st.session_state.logged_in = True
-                        st.rerun()
+                    st.rerun()
                 else:
                     st.error("Invalid or expired OTP.")
 
+        if st.session_state.otp_verified:
+            password = st.text_input("Set Password", type="password")
+            if st.button("Register"):
+                supabase.table("users").insert({
+                    "email": st.session_state.email,
+                    "password": hash_password(password),
+                    "created_at": datetime.now().isoformat()
+                }).execute()
+                st.success("User registered successfully!")
+                st.session_state.logged_in = True
+                st.rerun()
+
 else:
+    # Main App
     st.success(f"Welcome, {st.session_state.email}!")
     if st.button("Logout"):
         st.session_state.logged_in = False
         st.session_state.email = ""
+        st.session_state.otp_sent = False
+        st.session_state.otp_verified = False
         st.rerun()
 
     uploaded_file = st.file_uploader("Upload thermal image...", type=["jpg", "jpeg", "png"])
