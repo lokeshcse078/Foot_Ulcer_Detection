@@ -48,7 +48,6 @@ def preprocess_image(image):
     return image
 
 # OTP Handling
-# Ensure the session state key exists
 if "otp_store" not in st.session_state:
     st.session_state.otp_store = {}
 
@@ -108,6 +107,8 @@ if "otp_sent" not in st.session_state:
     st.session_state.otp_sent = False
 if "otp_verified" not in st.session_state:
     st.session_state.otp_verified = False
+if "user_name" not in st.session_state:
+    st.session_state.user_name = ""
 
 # Authentication
 if not st.session_state.logged_in:
@@ -126,6 +127,7 @@ if not st.session_state.logged_in:
                     if hash_password(password) == user["password"]:
                         st.session_state.logged_in = True
                         st.session_state.email = email
+                        st.session_state.user_name = user.get("name", "")
                         st.success("Login successful!")
                         st.rerun()
                     else:
@@ -151,31 +153,41 @@ if not st.session_state.logged_in:
             if st.button("Verify OTP"):
                 if verify_otp(st.session_state.email, otp):
                     st.session_state.otp_verified = True
-                    st.success("OTP verified. Please set a password.")
+                    st.success("OTP verified. Please set a password and name.")
                     st.rerun()
                 else:
                     st.error("Invalid or expired OTP.")
 
         if st.session_state.otp_verified:
+            name = st.text_input("Full Name")
             password = st.text_input("Set Password", type="password")
             if st.button("Register"):
-                supabase.table("user").insert({
-                    "email": st.session_state.email,
-                    "password": hash_password(password),
-                    "created_at": datetime.now().isoformat()
-                }).execute()
-                st.success("User registered successfully!")
-                st.session_state.logged_in = True
-                st.rerun()
+                if name and password:
+                    try:
+                        supabase.table("user").insert({
+                            "email": st.session_state.email,
+                            "name": name,
+                            "password": hash_password(password),
+                            "created_at": datetime.now().isoformat()
+                        }).execute()
+                        st.success("User registered successfully!")
+                        st.session_state.logged_in = True
+                        st.session_state.user_name = name
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Registration failed: {e}")
+                else:
+                    st.warning("Please fill in all fields.")
 
 else:
     # Main App
-    st.success(f"Welcome, {st.session_state.email}!")
+    st.success(f"Welcome, {st.session_state.user_name or st.session_state.email}!")
     if st.button("Logout"):
         st.session_state.logged_in = False
         st.session_state.email = ""
         st.session_state.otp_sent = False
         st.session_state.otp_verified = False
+        st.session_state.user_name = ""
         st.rerun()
 
     uploaded_file = st.file_uploader("Upload thermal image...", type=["jpg", "jpeg", "png"])
