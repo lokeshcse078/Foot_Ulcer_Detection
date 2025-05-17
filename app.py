@@ -11,18 +11,20 @@ import smtplib
 import random
 import sqlite3
 
-# Constants
-MODEL_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/releases/download/v1.0/model.h5"
-MODEL_PATH = "model.h5"
+MODEL_URL = st.secrets["model"]["url"]
+MODEL_PATH = st.secrets["model"]["path"]
+DB_FILE = st.secrets["database"]["file"]
+
 IMG_SIZE = (224, 224)
-DB_FILE = "otp_store.db"
+ 
 
 # Background image URL
 BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/bg.jpg"
 
-# Email credentials
-EMAIL_USER = "lokeshkumar.cse.078@gmail.com"
-EMAIL_PASS = "wwpo fizj fhxp wbbp"
+ # Email credentials from secrets
+EMAIL_USER = st.secrets["email"]["user"]
+EMAIL_PASS = st.secrets["email"]["pass"]
+
 
 @st.cache_resource
 def download_model():
