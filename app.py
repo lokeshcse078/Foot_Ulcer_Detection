@@ -159,7 +159,7 @@ if not st.session_state.logged_in:
         if st.session_state.otp_verified:
             password = st.text_input("Set Password", type="password")
             if st.button("Register"):
-                supabase.table("users").insert({
+                supabase.table("user").insert({
                     "email": st.session_state.email,
                     "password": hash_password(password),
                     "created_at": datetime.now().isoformat()
