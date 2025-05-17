@@ -9,22 +9,25 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import smtplib
 import random
-import sqlite3
+import hashlib
+from supabase import create_client, Client
 
+# Supabase credentials
+SUPABASE_URL = st.secrets["supabase"]["url"]
+SUPABASE_KEY = st.secrets["supabase"]["key"]
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+
+# Model & constants
 MODEL_URL = st.secrets["model"]["url"]
 MODEL_PATH = st.secrets["model"]["path"]
-DB_FILE = st.secrets["database"]["file"]
-
 IMG_SIZE = (224, 224)
- 
 
-# Background image URL
-BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/bg.jpg"
-
- # Email credentials from secrets
+# Email credentials
 EMAIL_USER = st.secrets["email"]["user"]
 EMAIL_PASS = st.secrets["email"]["pass"]
 
+# Background image
+BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/bg.jpg"
 
 @st.cache_resource
 def download_model():
@@ -44,32 +47,13 @@ def preprocess_image(image):
     image = np.expand_dims(image, axis=0)
     return image
 
-# Setup OTP table
-def create_otp_table():
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("""
-        CREATE TABLE IF NOT EXISTS otp_codes (
-            email TEXT,
-            otp TEXT,
-            expiry TIMESTAMP
-        )
-    """)
-    conn.commit()
-    conn.close()
-
-create_otp_table()
+# OTP Handling
+otp_store = {}
 
 def send_otp(email):
     otp = str(random.randint(100000, 999999))
     expiry = datetime.now() + timedelta(minutes=5)
-    expiry_str = expiry.strftime("%Y-%m-%d %H:%M:%S")
-
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("INSERT INTO otp_codes (email, otp, expiry) VALUES (?, ?, ?)", (email, otp, expiry_str))
-    conn.commit()
-    conn.close()
+    otp_store[email] = (otp, expiry)
 
     subject = "Your OTP Code"
     body = f"Your OTP code is {otp}. It is valid for 5 minutes."
@@ -91,17 +75,14 @@ def send_otp(email):
         return False
 
 def verify_otp(email, otp):
-    conn = sqlite3.connect(DB_FILE)
-    c = conn.cursor()
-    c.execute("SELECT otp, expiry FROM otp_codes WHERE email = ? ORDER BY expiry DESC LIMIT 1", (email,))
-    result = c.fetchone()
-    conn.close()
-    if result:
-        stored_otp, expiry = result
-        expiry_datetime = datetime.strptime(expiry, "%Y-%m-%d %H:%M:%S")
-        if stored_otp == otp and datetime.now() < expiry_datetime:
+    if email in otp_store:
+        stored_otp, expiry = otp_store[email]
+        if stored_otp == otp and datetime.now() < expiry:
             return True
     return False
+
+def hash_password(password):
+    return hashlib.sha256(password.encode()).hexdigest()
 
 # UI Styling
 st.markdown(f"""
@@ -122,10 +103,25 @@ if "logged_in" not in st.session_state:
 if "email" not in st.session_state:
     st.session_state.email = ""
 
-# OTP Login Flow
+# Authentication
 if not st.session_state.logged_in:
-    if not st.session_state.email:
-        email = st.text_input("Enter your email")
+    email = st.text_input("Email")
+
+    user_query = supabase.table("users").select("*").eq("email", email).execute()
+    user_exists = len(user_query.data) > 0
+
+    if user_exists:
+        password = st.text_input("Password", type="password")
+        if st.button("Login"):
+            user = user_query.data[0]
+            if hash_password(password) == user["password"]:
+                st.session_state.logged_in = True
+                st.session_state.email = email
+                st.success("Login successful!")
+                st.rerun()
+            else:
+                st.error("Incorrect password.")
+    else:
         if st.button("Send OTP"):
             if "@" in email and "." in email:
                 if send_otp(email):
@@ -134,18 +130,25 @@ if not st.session_state.logged_in:
                     st.rerun()
             else:
                 st.warning("Please enter a valid email address.")
-    else:
-        otp = st.text_input("Enter the OTP sent to your email")
-        if st.button("Verify OTP"):
-            if verify_otp(st.session_state.email, otp):
-                st.success("Login successful!")
-                st.session_state.logged_in = True
-                st.rerun()
-            else:
-                st.error("Invalid OTP or OTP expired.")
-        if st.button("Resend OTP"):
-            send_otp(st.session_state.email)
-            st.success("OTP resent.")
+
+        if st.session_state.email:
+            otp = st.text_input("Enter OTP sent to your email")
+            if st.button("Verify OTP"):
+                if verify_otp(st.session_state.email, otp):
+                    st.success("OTP verified. Please set a password.")
+                    password = st.text_input("Set Password", type="password")
+                    if st.button("Register"):
+                        supabase.table("users").insert({
+                            "email": st.session_state.email,
+                            "password": hash_password(password),
+                            "created_at": datetime.now().isoformat()
+                        }).execute()
+                        st.success("User registered successfully!")
+                        st.session_state.logged_in = True
+                        st.rerun()
+                else:
+                    st.error("Invalid or expired OTP.")
+
 else:
     st.success(f"Welcome, {st.session_state.email}!")
     if st.button("Logout"):
