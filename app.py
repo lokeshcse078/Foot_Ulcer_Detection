@@ -159,34 +159,34 @@ if not st.session_state.logged_in:
                     st.error("Invalid or expired OTP.")
 
         if st.session_state.otp_verified:
-    name = st.text_input("Full Name")
-    password = st.text_input("Set Password", type="password")
-    
-    if st.button("Register"):
-        if name and password:
-            # Check if user already exists before inserting
-            existing = supabase.table("user").select("email").eq("email", st.session_state.email).execute()
-            if existing.data:
-                st.error("User already exists. Please login.")
-                st.session_state.otp_sent = False
-                st.session_state.otp_verified = False
-                st.rerun()
-            else:
-                try:
-                    supabase.table("user").insert({
-                        "email": st.session_state.email,
-                        "name": name,
-                        "password": hash_password(password),
-                        "created_at": datetime.now().isoformat()
-                    }).execute()
-                    st.success("User registered successfully!")
-                    st.session_state.logged_in = True
-                    st.session_state.user_name = name
-                    st.rerun()
-                except Exception as e:
-                    st.error(f"Registration failed: {e}")
-        else:
-            st.warning("Please fill in all fields.")
+            name = st.text_input("Full Name")
+            password = st.text_input("Set Password", type="password")
+            
+            if st.button("Register"):
+                if name and password:
+                    # Check if user already exists before inserting
+                    existing = supabase.table("user").select("email").eq("email", st.session_state.email).execute()
+                    if existing.data:
+                        st.error("User already exists. Please login.")
+                        st.session_state.otp_sent = False
+                        st.session_state.otp_verified = False
+                        st.rerun()
+                    else:
+                        try:
+                            supabase.table("user").insert({
+                                "email": st.session_state.email,
+                                "name": name,
+                                "password": hash_password(password),
+                                "created_at": datetime.now().isoformat()
+                            }).execute()
+                            st.success("User registered successfully!")
+                            st.session_state.logged_in = True
+                            st.session_state.user_name = name
+                            st.rerun()
+                        except Exception as e:
+                            st.error(f"Registration failed: {e}")
+                else:
+                    st.warning("Please fill in all fields.")
 
 
 else:
