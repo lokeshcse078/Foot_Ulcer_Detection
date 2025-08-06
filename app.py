@@ -9,8 +9,8 @@ import os
 # --------------------
 # Configuration
 # --------------------
-MODEL_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/releases/download/v1.0/trained_model.pth"
-MODEL_PATH = "trained_model.pth"
+MODEL_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/releases/download/v1.0/model.pth"
+MODEL_PATH = "model.pth"
 IMG_SIZE = (224, 224)
 
 # --------------------
