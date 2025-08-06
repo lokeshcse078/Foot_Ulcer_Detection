@@ -2,8 +2,10 @@ import os
 import requests
 import streamlit as st
 import numpy as np
-import tensorflow as tf
-from tensorflow.keras.preprocessing.image import load_img, img_to_array
+from PIL import Image
+import torch
+import torch.nn as nn
+import torchvision.transforms as transforms
 from datetime import datetime, timedelta
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -29,6 +31,28 @@ EMAIL_PASS = st.secrets["email"]["pass"]
 # Background image
 BACKGROUND_IMAGE_URL = "https://github.com/lokeshcse078/Foot_Ulcer_Detection/blob/main/bg.jpg?raw=true"
 
+# PyTorch model definition (must match training model architecture)
+class CNNModel(nn.Module):
+    def __init__(self):
+        super(CNNModel, self).__init__()
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, padding=1)
+        self.pool = nn.MaxPool2d(2)
+        self.conv2 = nn.Conv2d(16, 32, kernel_size=3, padding=1)
+        self.fc1 = nn.Linear(32 * 56 * 56, 64)
+        self.fc2 = nn.Linear(64, 1)
+        self.relu = nn.ReLU()
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        x = self.relu(self.conv1(x))   # [B, 16, 224, 224]
+        x = self.pool(x)               # [B, 16, 112, 112]
+        x = self.relu(self.conv2(x))   # [B, 32, 112, 112]
+        x = self.pool(x)               # [B, 32, 56, 56]
+        x = x.view(x.size(0), -1)      # Flatten
+        x = self.relu(self.fc1(x))
+        x = self.sigmoid(self.fc2(x))
+        return x
+
 @st.cache_resource
 def download_model():
     if not os.path.exists(MODEL_PATH):
@@ -36,16 +60,21 @@ def download_model():
             response = requests.get(MODEL_URL)
             with open(MODEL_PATH, "wb") as f:
                 f.write(response.content)
-    model = tf.keras.models.load_model(MODEL_PATH)
+    model = CNNModel()
+    model.load_state_dict(torch.load(MODEL_PATH, map_location=torch.device('cpu')))
+    model.eval()
     return model
 
 model = download_model()
 
-def preprocess_image(image):
-    image = image.resize(IMG_SIZE)
-    image = img_to_array(image) / 255.0
-    image = np.expand_dims(image, axis=0)
-    return image
+def preprocess_image(image: Image.Image):
+    transform = transforms.Compose([
+        transforms.Resize(IMG_SIZE),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.5]*3, std=[0.5]*3)
+    ])
+    image = image.convert("RGB")
+    return transform(image).unsqueeze(0)  # Shape: [1, 3, 224, 224]
 
 # OTP Handling
 if "otp_store" not in st.session_state:
@@ -164,7 +193,6 @@ if not st.session_state.logged_in:
             
             if st.button("Register"):
                 if name and password:
-                    # Check if user already exists before inserting
                     existing = supabase.table("user").select("email").eq("email", st.session_state.email).execute()
                     if existing.data:
                         st.error("User already exists. Please login.")
@@ -202,15 +230,16 @@ else:
 
     uploaded_file = st.file_uploader("Upload thermal image...", type=["jpg", "jpeg", "png"])
     if uploaded_file:
-        image = load_img(uploaded_file)
+        image = Image.open(uploaded_file)
         st.image(image, caption="Uploaded Image", use_column_width=True)
 
         processed = preprocess_image(image)
-        prediction = model.predict(processed)[0][0]
+        with torch.no_grad():
+            prediction = model(processed)[0].item()
 
         st.subheader("Prediction Result")
         if prediction > 0.5:
             st.error("Prediction: Foot ulcer detected! ⚠️")
         else:
-            st.write(f"Confidence: {prediction*100:.2f}%")
+            st.write(f"Confidence: {(1 - prediction)*100:.2f}%")
             st.success("Prediction: No foot ulcer detected ✅")
